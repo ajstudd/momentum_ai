@@ -1,7 +1,7 @@
 // Gemini API integration for quest suggestions
 
 const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
+  "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
 
 interface GeminiQuestReward {
   type: string;
@@ -215,7 +215,6 @@ export async function getGeminiQuests(
     .map(([key, value]) => `- ${key}: ${value}`)
     .join("\n");
 
-  // Fill in the stats, logs, and profile in the context
   const prompt = USER_CONTEXT.replace("{profile}", profileString)
     .replace("{strength}", String(stats.strength ?? 0))
     .replace("{agility}", String(stats.agility ?? 0))
@@ -232,18 +231,35 @@ export async function getGeminiQuests(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.8, maxOutputTokens: 2048 },
+      generationConfig: { temperature: 0.8, maxOutputTokens: 8192 },
     }),
   });
   console.log("[Gemini] Response status:", res.status);
   const data = await res.json();
   console.log("[Gemini] Response body:", JSON.stringify(data));
   if (!res.ok) throw new Error(data?.error?.message || "Gemini API error");
-  // Parse Gemini's response for quest suggestions and system
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  // Try to extract the first valid JSON object from the response
+
+  const candidate = data?.candidates?.[0];
+  if (candidate?.finishReason === "MAX_TOKENS") {
+    throw new Error(
+      "Gemini response was truncated due to token limit. The JSON response is incomplete."
+    );
+  }
+
+  const text = candidate?.content?.parts?.[0]?.text || "";
+  if (!text) {
+    throw new Error(
+      `Gemini returned empty response. Finish reason: ${
+        candidate?.finishReason || "unknown"
+      }`
+    );
+  }
+
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Gemini did not return valid JSON.\n" + text);
+  if (!jsonMatch)
+    throw new Error(
+      "Gemini did not return valid JSON.\nResponse text: " + text
+    );
   try {
     const parsed = JSON.parse(jsonMatch[0]);
     return parsed;
