@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwt } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongodb";
 import User from "@/lib/models/User";
+import Stats from "@/lib/models/stats";
+import StatLog from "@/lib/models/StatLog";
+import CompletedQuest from "@/lib/models/CompletedQuest";
+import Passive from "@/lib/models/Passive";
+import Title from "@/lib/models/Title";
+import Badge from "@/lib/models/Badge";
 
 // Body: { questTitle, questDescription, rewards: [{type, value}], statGains: [{stat, amount}] }
 export async function POST(req: NextRequest) {
@@ -20,14 +26,37 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
+
+  // Get or create stats
+  let stats = await Stats.findOne({ userId: payload.userId });
+  if (!stats) {
+    stats = await Stats.create({
+      userId: payload.userId,
+      strength: 1,
+      vitality: 1,
+      agility: 1,
+      intelligence: 1,
+      perception: 1,
+    });
+  }
+
   // Update stats
   if (Array.isArray(statGains)) {
     for (const gain of statGains) {
-      if (user.stats[gain.stat] !== undefined) {
-        const oldValue = user.stats[gain.stat];
-        user.stats[gain.stat] += gain.amount;
-        const newValue = user.stats[gain.stat];
-        user.logs.unshift({
+      const statKey = gain.stat as
+        | "strength"
+        | "vitality"
+        | "agility"
+        | "intelligence"
+        | "perception";
+      if (stats[statKey] !== undefined) {
+        const oldValue = stats[statKey];
+        stats[statKey] += gain.amount;
+        const newValue = stats[statKey];
+
+        // Create stat log
+        await StatLog.create({
+          userId: payload.userId,
           stat: gain.stat,
           oldValue,
           newValue,
@@ -35,7 +64,9 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+    await stats.save();
   }
+
   // Process XP, passives, titles, badges from rewards
   if (Array.isArray(rewards)) {
     for (const reward of rewards) {
@@ -64,27 +95,45 @@ export async function POST(req: NextRequest) {
         user.level = currentLevel;
         user.xp = currentXP;
       } else if (reward.type === "Passive") {
-        if (!user.passives) user.passives = [];
-        if (!user.passives.some((p) => p.title === reward.value)) {
-          user.passives.push({
+        // Check if passive already exists
+        const existingPassive = await Passive.findOne({
+          userId: payload.userId,
+          title: reward.value,
+        });
+
+        if (!existingPassive) {
+          await Passive.create({
+            userId: payload.userId,
             title: reward.value,
             description: reward.value,
             awardedAt: new Date(),
           });
         }
       } else if (reward.type === "Title") {
-        if (!user.titles) user.titles = [];
-        if (!user.titles.some((t) => t.title === reward.value)) {
-          user.titles.push({
+        // Check if title already exists
+        const existingTitle = await Title.findOne({
+          userId: payload.userId,
+          title: reward.value,
+        });
+
+        if (!existingTitle) {
+          await Title.create({
+            userId: payload.userId,
             title: reward.value,
             description: reward.value,
             awardedAt: new Date(),
           });
         }
       } else if (reward.type === "Badge") {
-        if (!user.badges) user.badges = [];
-        if (!user.badges.some((b) => b.title === reward.value)) {
-          user.badges.push({
+        // Check if badge already exists
+        const existingBadge = await Badge.findOne({
+          userId: payload.userId,
+          title: reward.value,
+        });
+
+        if (!existingBadge) {
+          await Badge.create({
+            userId: payload.userId,
             title: reward.value,
             description: reward.value,
             icon: "🏅",
@@ -95,8 +144,10 @@ export async function POST(req: NextRequest) {
       }
     }
   }
-  // Add to completedQuests (now with description)
-  user.completedQuests.unshift({
+
+  // Add to completedQuests
+  await CompletedQuest.create({
+    userId: payload.userId,
     questTitle,
     questDescription: questDescription || "",
     completedAt: new Date(),
@@ -104,14 +155,41 @@ export async function POST(req: NextRequest) {
   });
 
   await user.save();
+
+  // Get updated data to return
+  const updatedCompletedQuests = await CompletedQuest.find({
+    userId: payload.userId,
+  })
+    .sort({ completedAt: -1 })
+    .limit(100)
+    .lean();
+
+  const updatedPassives = await Passive.find({ userId: payload.userId })
+    .sort({ awardedAt: -1 })
+    .lean();
+
+  const updatedTitles = await Title.find({ userId: payload.userId })
+    .sort({ awardedAt: -1 })
+    .lean();
+
+  const updatedBadges = await Badge.find({ userId: payload.userId })
+    .sort({ awardedAt: -1 })
+    .lean();
+
   return NextResponse.json({
     success: true,
-    stats: user.stats,
+    stats: {
+      strength: stats.strength,
+      vitality: stats.vitality,
+      agility: stats.agility,
+      intelligence: stats.intelligence,
+      perception: stats.perception,
+    },
     xp: user.xp,
     level: user.level,
-    completedQuests: user.completedQuests,
-    passives: user.passives,
-    titles: user.titles,
-    badges: user.badges,
+    completedQuests: updatedCompletedQuests,
+    passives: updatedPassives,
+    titles: updatedTitles,
+    badges: updatedBadges,
   });
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwt } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongodb";
 import User from "@/lib/models/User";
+import QuestLog from "@/lib/models/QuestLog";
 
 // POST: Log quest activity (internal, not shown to user)
 export async function POST(req: NextRequest) {
@@ -16,16 +17,19 @@ export async function POST(req: NextRequest) {
   }
   await connectToDB();
   const body = await req.json();
+
   const user = await User.findById(payload.userId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
-  user.questLogs = user.questLogs || [];
-  user.questLogs.push({
+
+  // Create quest log
+  await QuestLog.create({
+    userId: payload.userId,
     date: new Date(),
     skippedSections: body.skippedSections || [],
     progress: body.progress || {},
   });
-  await user.save();
+
   return NextResponse.json({ success: true });
 }
