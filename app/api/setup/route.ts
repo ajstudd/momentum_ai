@@ -221,11 +221,11 @@ export async function POST(req: NextRequest) {
       },
       message: `Assessment complete! Your starting stats have been assigned:
       
-🔥 Strength: ${analyzedStats.strength || 5}
-❤️ Vitality: ${analyzedStats.vitality || 5}  
-⚡ Agility: ${analyzedStats.agility || 5}
-🧠 Intelligence: ${analyzedStats.intelligence || 5}
-👁️ Perception: ${analyzedStats.perception || 5}
+• Strength: ${analyzedStats.strength || 5}
+• Vitality: ${analyzedStats.vitality || 5}  
+• Agility: ${analyzedStats.agility || 5}
+• Intelligence: ${analyzedStats.intelligence || 5}
+• Perception: ${analyzedStats.perception || 5}
 
 Your journey as a Hunter begins now!`,
     });

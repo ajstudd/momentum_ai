@@ -28,7 +28,6 @@ const StatsSchema = new Schema<IStats>(
   { timestamps: true }
 );
 
-// Index for fast lookups by userId
 StatsSchema.index({ userId: 1 });
 
 // Force recompilation in dev/hot-reload environments

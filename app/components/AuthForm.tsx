@@ -131,8 +131,12 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
 
                             {/* Content */}
                             <div className="text-center space-y-6">
-                                <div className="text-4xl font-bold text-blue-100 mb-6 tracking-wider animate-pulse">
-                                    ⚡ SYSTEM NOTIFICATION ⚡
+                                <div className="text-4xl font-bold text-blue-100 mb-6 tracking-wider animate-pulse flex items-center justify-center gap-3">
+                                    <span className="inline-block w-8 h-8 rounded-full bg-blue-500 animate-ping absolute"></span>
+                                    <span className="inline-block w-8 h-8 rounded-full bg-blue-400 relative"></span>
+                                    <span>SYSTEM NOTIFICATION</span>
+                                    <span className="inline-block w-8 h-8 rounded-full bg-blue-400 relative"></span>
+                                    <span className="inline-block w-8 h-8 rounded-full bg-blue-500 animate-ping absolute"></span>
                                 </div>
 
                                 <div className="text-2xl text-blue-200 font-semibold leading-relaxed">

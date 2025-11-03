@@ -8,6 +8,7 @@ import CompletedQuest from "@/lib/models/CompletedQuest";
 import Passive from "@/lib/models/Passive";
 import Title from "@/lib/models/Title";
 import Badge from "@/lib/models/Badge";
+import { checkAndUnlockAchievements } from "@/lib/achievement-checker";
 
 // Body: { questTitle, questDescription, rewards: [{type, value}], statGains: [{stat, amount}] }
 export async function POST(req: NextRequest) {
@@ -136,7 +137,7 @@ export async function POST(req: NextRequest) {
             userId: payload.userId,
             title: reward.value,
             description: reward.value,
-            icon: "🏅",
+            icon: "B",
             color: "#FFD700",
             awardedAt: new Date(),
           });
@@ -155,6 +156,9 @@ export async function POST(req: NextRequest) {
   });
 
   await user.save();
+
+  // Auto-check and unlock achievements based on current stats/level/quest count
+  const newlyUnlocked = await checkAndUnlockAchievements(payload.userId);
 
   // Get updated data to return
   const updatedCompletedQuests = await CompletedQuest.find({
@@ -191,5 +195,10 @@ export async function POST(req: NextRequest) {
     passives: updatedPassives,
     titles: updatedTitles,
     badges: updatedBadges,
+    newlyUnlocked: newlyUnlocked.map((u) => ({
+      type: u.type,
+      title: u.definition.title,
+      description: u.definition.description,
+    })),
   });
 }

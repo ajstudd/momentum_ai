@@ -17,11 +17,9 @@ const FocusLogSchema = new Schema<IFocusLog>(
   { timestamps: true }
 );
 
-// Indexes for efficient queries
-FocusLogSchema.index({ userId: 1, chosenAt: -1 }); // Get user focus logs sorted by date
-FocusLogSchema.index({ userId: 1, stat: 1 }); // Get focus logs for specific stat
+FocusLogSchema.index({ userId: 1, chosenAt: -1 });
+FocusLogSchema.index({ userId: 1, stat: 1 });
 
-// Force recompilation in dev/hot-reload environments
 if (mongoose.models.FocusLog) {
   delete mongoose.models.FocusLog;
 }

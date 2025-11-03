@@ -17,10 +17,8 @@ const QuestLogSchema = new Schema<IQuestLog>(
   { timestamps: true }
 );
 
-// Indexes for efficient queries
-QuestLogSchema.index({ userId: 1, date: -1 }); // Get user quest logs sorted by date
+QuestLogSchema.index({ userId: 1, date: -1 });
 
-// Force recompilation in dev/hot-reload environments
 if (mongoose.models.QuestLog) {
   delete mongoose.models.QuestLog;
 }

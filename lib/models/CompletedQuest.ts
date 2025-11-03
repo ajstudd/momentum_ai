@@ -27,11 +27,9 @@ const CompletedQuestSchema = new Schema<ICompletedQuest>(
   { timestamps: true }
 );
 
-// Indexes for efficient queries
-CompletedQuestSchema.index({ userId: 1, completedAt: -1 }); // Get user quests sorted by completion date
-CompletedQuestSchema.index({ userId: 1, questTitle: 1 }); // Check if specific quest completed
+CompletedQuestSchema.index({ userId: 1, completedAt: -1 });
+CompletedQuestSchema.index({ userId: 1, questTitle: 1 });
 
-// Force recompilation in dev/hot-reload environments
 if (mongoose.models.CompletedQuest) {
   delete mongoose.models.CompletedQuest;
 }

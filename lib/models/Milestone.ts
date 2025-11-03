@@ -19,12 +19,10 @@ const MilestoneSchema = new Schema<IMilestone>(
   { timestamps: true }
 );
 
-// Indexes for efficient queries
-MilestoneSchema.index({ userId: 1 }); // Get all user milestones
-MilestoneSchema.index({ userId: 1, achieved: 1 }); // Filter by achievement status
-MilestoneSchema.index({ userId: 1, badge: 1 }); // Check specific milestone
+MilestoneSchema.index({ userId: 1 });
+MilestoneSchema.index({ userId: 1, achieved: 1 });
+MilestoneSchema.index({ userId: 1, badge: 1 });
 
-// Force recompilation in dev/hot-reload environments
 if (mongoose.models.Milestone) {
   delete mongoose.models.Milestone;
 }

@@ -4,6 +4,7 @@ import { connectToDB } from "@/lib/mongodb";
 import User from "@/lib/models/User";
 import Stats from "@/lib/models/stats";
 import StatLog from "@/lib/models/StatLog";
+import { checkAndUnlockAchievements } from "@/lib/achievement-checker";
 
 // GET: Get user stats and logs
 export async function GET(req: NextRequest) {
@@ -117,6 +118,9 @@ export async function PATCH(req: NextRequest) {
     newValue: value,
     changedAt: new Date(),
   });
+
+  // Auto-check and unlock achievements based on new stat values
+  await checkAndUnlockAchievements(payload.userId);
 
   // Get updated logs
   const logs = await StatLog.find({ userId: payload.userId })

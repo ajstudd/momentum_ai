@@ -19,11 +19,9 @@ const PassiveSchema = new Schema<IPassive>(
   { timestamps: true }
 );
 
-// Indexes for efficient queries
-PassiveSchema.index({ userId: 1, awardedAt: -1 }); // Get user passives sorted by award date
-PassiveSchema.index({ userId: 1, title: 1 }); // Check if specific passive exists
+PassiveSchema.index({ userId: 1, awardedAt: -1 });
+PassiveSchema.index({ userId: 1, title: 1 });
 
-// Force recompilation in dev/hot-reload environments
 if (mongoose.models.Passive) {
   delete mongoose.models.Passive;
 }

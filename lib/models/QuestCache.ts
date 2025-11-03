@@ -2,7 +2,7 @@ import mongoose, { Schema, model, Document } from "mongoose";
 
 export interface IQuestCache extends Document {
   userId: mongoose.Types.ObjectId;
-  quests: unknown; // GeminiSections type
+  quests: unknown;
   updatedAt: Date;
 }
 
@@ -20,11 +20,9 @@ const QuestCacheSchema = new Schema<IQuestCache>(
   { timestamps: true }
 );
 
-// Indexes for efficient queries
-QuestCacheSchema.index({ userId: 1 }); // Fast lookup by user
-QuestCacheSchema.index({ userId: 1, updatedAt: -1 }); // Check cache freshness
+QuestCacheSchema.index({ userId: 1 });
+QuestCacheSchema.index({ userId: 1, updatedAt: -1 });
 
-// Force recompilation in dev/hot-reload environments
 if (mongoose.models.QuestCache) {
   delete mongoose.models.QuestCache;
 }

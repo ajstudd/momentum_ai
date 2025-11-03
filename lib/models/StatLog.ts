@@ -19,9 +19,8 @@ const StatLogSchema = new Schema<IStatLog>(
   { timestamps: true }
 );
 
-// Indexes for efficient queries
-StatLogSchema.index({ userId: 1, changedAt: -1 }); // Get user logs sorted by date
-StatLogSchema.index({ userId: 1, stat: 1 }); // Get logs for specific stat
+StatLogSchema.index({ userId: 1, changedAt: -1 });
+StatLogSchema.index({ userId: 1, stat: 1 });
 
 // Force recompilation in dev/hot-reload environments
 if (mongoose.models.StatLog) {

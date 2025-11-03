@@ -41,7 +41,6 @@ const UserSchema = new Schema<IUser>(
   { timestamps: true }
 );
 
-// Index for fast email lookups
 UserSchema.index({ email: 1 });
 
 // Force recompilation of the model in dev/hot-reload environments
