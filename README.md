@@ -2,6 +2,8 @@
 
 My personal gamified self-improvement web application that transforms everyday goals into an RPG-style adventure. Inspired by the Solo Leveling series, I built this to turn my personal development journey into an engaging game where I track five core stats (Strength, Vitality, Agility, Intelligence, Perception), complete AI-generated daily quests, gain XP, unlock badges and titles, and watch my character sheet level up as I improve in real life.
 
+**🚀 Live Demo:** [https://arise.junaid.co.in/](https://arise.junaid.co.in/)
+
 ## What This Project Does
 
 This is my digital companion for self-improvement. The app uses Google's Gemini AI to generate personalized daily quests based on my current stats, goals, and history. Every quest I complete awards XP and stat gains, creating a feedback loop that keeps me motivated. The system maintains detailed logs of my progress, caches quest data for instant loading, and adapts to my growth over time.
