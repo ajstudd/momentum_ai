@@ -53,13 +53,20 @@ export async function POST(req: NextRequest) {
   await Milestone.deleteMany({ userId: payload.userId });
 
   if (Array.isArray(body.milestones)) {
-    const milestonesToCreate = body.milestones.map((m: any) => ({
-      userId: payload.userId,
-      badge: m.badge,
-      achieved: m.achieved,
-      achievedAt: m.achievedAt,
-      criteria: m.criteria,
-    }));
+    const milestonesToCreate = body.milestones.map(
+      (m: {
+        badge: string;
+        achieved: boolean;
+        achievedAt: Date;
+        criteria: string;
+      }) => ({
+        userId: payload.userId,
+        badge: m.badge,
+        achieved: m.achieved,
+        achievedAt: m.achievedAt,
+        criteria: m.criteria,
+      })
+    );
 
     await Milestone.insertMany(milestonesToCreate);
   }

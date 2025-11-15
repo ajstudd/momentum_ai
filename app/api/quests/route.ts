@@ -27,9 +27,9 @@ export async function GET(req: NextRequest) {
   }
 
   // Get stats
-  let stats = await Stats.findOne({ userId: payload.userId }).lean();
+  const stats = await Stats.findOne({ userId: payload.userId }).lean();
   if (!stats) {
-    const newStats = await Stats.create({
+    await Stats.create({
       userId: payload.userId,
       strength: 1,
       vitality: 1,
@@ -37,14 +37,10 @@ export async function GET(req: NextRequest) {
       intelligence: 1,
       perception: 1,
     });
-    stats = {
-      userId: newStats.userId,
-      strength: newStats.strength,
-      vitality: newStats.vitality,
-      agility: newStats.agility,
-      intelligence: newStats.intelligence,
-      perception: newStats.perception,
-    } as any;
+    return NextResponse.json(
+      { error: "Stats initialized. Please retry." },
+      { status: 503 }
+    );
   }
 
   // Get focus logs
