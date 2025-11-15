@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwt } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongodb";
 import User from "@/lib/models/User";
+import CompletedQuest from "@/lib/models/CompletedQuest";
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization");
@@ -14,17 +15,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
   await connectToDB();
-  const user = await User.findById(payload.userId).select("completedQuests");
+
+  const user = await User.findById(payload.userId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
+
+  // Get completed quests from CompletedQuest collection
+  const completedQuests = await CompletedQuest.find({ userId: payload.userId })
+    .sort({ completedAt: -1 })
+    .lean();
+
   // Transform the data to include all quest details
-  const completedQuests = user.completedQuests || [];
   const formattedQuests = completedQuests.map((quest) => ({
     questTitle: quest.questTitle,
     questDescription: quest.questDescription || "",
     completedAt: quest.completedAt,
     rewards: quest.rewards || [],
   }));
+
   return NextResponse.json(formattedQuests);
 }

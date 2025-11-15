@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwt } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongodb";
 import User from "@/lib/models/User";
+import Stats from "@/lib/models/stats";
+import QuestCache from "@/lib/models/QuestCache";
 
 // This route is for testing purposes only - allows resetting setup status
 export async function POST(req: NextRequest) {
@@ -28,16 +30,20 @@ export async function POST(req: NextRequest) {
     user.setupCompleted = false;
 
     // Reset stats to default
-    user.stats = {
-      strength: 1,
-      vitality: 1,
-      agility: 1,
-      intelligence: 1,
-      perception: 1,
-    };
+    await Stats.findOneAndUpdate(
+      { userId: payload.userId },
+      {
+        strength: 1,
+        vitality: 1,
+        agility: 1,
+        intelligence: 1,
+        perception: 1,
+      },
+      { upsert: true }
+    );
 
     // Clear quest cache
-    user.questCache = undefined;
+    await QuestCache.deleteOne({ userId: payload.userId });
 
     await user.save();
 

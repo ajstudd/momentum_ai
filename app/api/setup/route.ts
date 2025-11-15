@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwt } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongodb";
 import User from "@/lib/models/User";
+import Stats from "@/lib/models/stats";
+import QuestCache from "@/lib/models/QuestCache";
 import SetupResponse from "@/lib/models/SetupResponse";
 import { SETUP_QUESTIONS } from "@/lib/setup-questions";
 
@@ -188,30 +190,42 @@ export async function POST(req: NextRequest) {
     });
 
     // Update user with new stats and mark setup as complete
-    user.stats = {
-      strength: analyzedStats.strength || 5,
-      vitality: analyzedStats.vitality || 5,
-      agility: analyzedStats.agility || 5,
-      intelligence: analyzedStats.intelligence || 5,
-      perception: analyzedStats.perception || 5,
-    };
+    await Stats.findOneAndUpdate(
+      { userId: payload.userId },
+      {
+        userId: payload.userId,
+        strength: analyzedStats.strength || 5,
+        vitality: analyzedStats.vitality || 5,
+        agility: analyzedStats.agility || 5,
+        intelligence: analyzedStats.intelligence || 5,
+        perception: analyzedStats.perception || 5,
+      },
+      { upsert: true }
+    );
+
     user.setupCompleted = true;
 
     // Clear quest cache to regenerate with new stats
-    user.questCache = undefined;
+    await QuestCache.deleteOne({ userId: payload.userId });
 
     await user.save();
 
     return NextResponse.json({
       success: true,
-      stats: user.stats,
+      stats: {
+        strength: analyzedStats.strength || 5,
+        vitality: analyzedStats.vitality || 5,
+        agility: analyzedStats.agility || 5,
+        intelligence: analyzedStats.intelligence || 5,
+        perception: analyzedStats.perception || 5,
+      },
       message: `Assessment complete! Your starting stats have been assigned:
       
-🔥 Strength: ${analyzedStats.strength || 5}
-❤️ Vitality: ${analyzedStats.vitality || 5}  
-⚡ Agility: ${analyzedStats.agility || 5}
-🧠 Intelligence: ${analyzedStats.intelligence || 5}
-👁️ Perception: ${analyzedStats.perception || 5}
+• Strength: ${analyzedStats.strength || 5}
+• Vitality: ${analyzedStats.vitality || 5}  
+• Agility: ${analyzedStats.agility || 5}
+• Intelligence: ${analyzedStats.intelligence || 5}
+• Perception: ${analyzedStats.perception || 5}
 
 Your journey as a Hunter begins now!`,
     });

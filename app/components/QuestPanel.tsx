@@ -51,6 +51,20 @@ interface CompletedQuestItem {
     rewards: { type: string; value: string }[];
 }
 
+interface AchievementProgress {
+    definition: {
+        id: string;
+        type: string;
+        title: string;
+        description: string;
+        unlockCondition: string;
+    };
+    current: number;
+    required: number;
+    percentage: number;
+    unlocked: boolean;
+}
+
 interface QuestPanelProps {
     stats: Record<string, number>;
     onUserDataChange?: () => void;
@@ -65,6 +79,7 @@ export default function QuestPanel({ stats, onUserDataChange }: QuestPanelProps)
     const [pendingQuest, setPendingQuest] = useState<GeminiQuest | null>(null);
     const [focusStat, setFocusStat] = useState<string>("");
     const [completed, setCompleted] = useState<CompletedQuestItem[]>([]);
+    const [achievementProgress, setAchievementProgress] = useState<AchievementProgress[]>([]);
     const statOptions = ["strength", "vitality", "agility", "intelligence", "perception"];
     const authenticatedFetch = useAuthenticatedFetch();
 
@@ -102,6 +117,18 @@ export default function QuestPanel({ stats, onUserDataChange }: QuestPanelProps)
                 if (Array.isArray(data)) setCompleted(data);
             })
             .catch(() => setCompleted([]));
+
+        // Fetch achievement progress
+        authenticatedFetch("/api/achievements")
+            .then((res) => {
+                if (!res) return;
+                return res.json();
+            })
+            .then((data) => {
+                if (!data) return;
+                if (data.all) setAchievementProgress(data.all);
+            })
+            .catch(() => setAchievementProgress([]));
     }, [stats, refreshKey, authenticatedFetch]);
 
     async function handleQuestComplete(quest: GeminiQuest) {
@@ -164,7 +191,7 @@ export default function QuestPanel({ stats, onUserDataChange }: QuestPanelProps)
             <Tabs.Root defaultValue="questlines" className="flex flex-col h-full">
                 <div className="top-0 z-10 bg-[#18181b]/90 rounded-t-xl">
                     <div className="flex items-center justify-between px-6 pt-6 pb-2">
-                        <div className="text-lg font-bold text-indigo-300 tracking-wide">RPG Quest System</div>
+                        <div className="text-lg font-bold text-indigo-300 tracking-wide">Quest System</div>
                         <button
                             onClick={refreshQuests}
                             className="ml-2 px-2 py-1 rounded bg-indigo-700 text-white font-bold hover:bg-indigo-600 focus:ring-2 focus:ring-indigo-400 transition text-xs"
@@ -174,6 +201,12 @@ export default function QuestPanel({ stats, onUserDataChange }: QuestPanelProps)
                     </div>
                     <Tabs.List className="flex gap-2 px-6 pb-2 border-b border-indigo-700/40 overflow-x-auto scrollbar-thin scrollbar-thumb-indigo-700 scrollbar-track-transparent bg-[#18181b]/90 rounded-t-xl">
                         <Tabs.Trigger value="questlines" className="px-3 py-1 rounded-t bg-[#232136] text-indigo-200 font-semibold data-[state=active]:bg-indigo-700 data-[state=active]:text-white transition whitespace-nowrap">Questlines</Tabs.Trigger>
+                        <Tabs.Trigger value="achievements" className="px-3 py-1 rounded-t bg-[#232136] text-indigo-200 font-semibold data-[state=active]:bg-indigo-700 data-[state=active]:text-white transition whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1">
+                                <span className="w-4 h-4 rounded-full bg-yellow-500 flex items-center justify-center text-xs font-bold text-black">A</span>
+                                Achievements
+                            </span>
+                        </Tabs.Trigger>
                         <Tabs.Trigger value="passives" className="px-3 py-1 rounded-t bg-[#232136] text-indigo-200 font-semibold data-[state=active]:bg-indigo-700 data-[state=active]:text-white transition whitespace-nowrap">Passives</Tabs.Trigger>
                         <Tabs.Trigger value="metrics" className="px-3 py-1 rounded-t bg-[#232136] text-indigo-200 font-semibold data-[state=active]:bg-indigo-700 data-[state=active]:text-white transition whitespace-nowrap">Metrics</Tabs.Trigger>
                         <Tabs.Trigger value="report" className="px-3 py-1 rounded-t bg-[#232136] text-indigo-200 font-semibold data-[state=active]:bg-indigo-700 data-[state=active]:text-white transition whitespace-nowrap">Report</Tabs.Trigger>
@@ -228,6 +261,108 @@ export default function QuestPanel({ stats, onUserDataChange }: QuestPanelProps)
                                                 </div>
                                             </div>
                                         ))}
+                                    </div>
+                                </Tabs.Content>
+                                <Tabs.Content value="achievements">
+                                    <div className="space-y-6 max-h-[400px] sm:max-h-[420px] overflow-y-auto pr-2">
+                                        <div className="mb-4 border-l-4 border-indigo-500 pl-4 bg-indigo-900/20 p-3 rounded-r">
+                                            <h3 className="text-lg font-bold text-indigo-300 mb-2">Your Achievement Progress</h3>
+                                            <p className="text-sm text-indigo-200">Track your progress toward unlocking new passives, titles, and badges!</p>
+                                        </div>
+
+                                        {achievementProgress.length === 0 ? (
+                                            <div className="text-zinc-400">Loading achievements...</div>
+                                        ) : (
+                                            <>
+                                                {/* Locked Achievements - In Progress */}
+                                                <div className="mb-6">
+                                                    <h4 className="text-md font-bold text-yellow-400 mb-3 flex items-center gap-2 border-b border-yellow-700/40 pb-2">
+                                                        <span className="w-5 h-5 rounded bg-yellow-700 flex items-center justify-center text-xs font-bold">
+                                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                                                            </svg>
+                                                        </span>
+                                                        Locked Achievements ({achievementProgress.filter(a => !a.unlocked).length})
+                                                    </h4>
+                                                    <div className="space-y-3">
+                                                        {achievementProgress
+                                                            .filter(a => !a.unlocked)
+                                                            .sort((a, b) => b.percentage - a.percentage)
+                                                            .map((achievement, i) => (
+                                                                <div key={i} className="bg-[#232136] rounded-lg p-3 border border-yellow-700/40 shadow hover:border-yellow-500/60 transition-colors">
+                                                                    <div className="flex items-start justify-between mb-2">
+                                                                        <div className="flex-1">
+                                                                            <div className="flex items-center gap-2 mb-1">
+                                                                                <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold text-white ${achievement.definition.type === 'passive' ? 'bg-purple-700' :
+                                                                                    achievement.definition.type === 'title' ? 'bg-indigo-900' :
+                                                                                        'bg-yellow-600'
+                                                                                    }`}>
+                                                                                    {achievement.definition.type.toUpperCase()}
+                                                                                </span>
+                                                                                <span className="text-indigo-100 font-bold text-sm">{achievement.definition.title}</span>
+                                                                            </div>
+                                                                            <p className="text-indigo-200 text-xs mb-1">{achievement.definition.description}</p>
+                                                                            <p className="text-yellow-300 text-xs mb-2 flex items-center gap-1">
+                                                                                <span className="inline-block w-1 h-1 rounded-full bg-yellow-400"></span>
+                                                                                {achievement.definition.unlockCondition}
+                                                                            </p>
+                                                                        </div>
+                                                                        <div className="text-right ml-2">
+                                                                            <div className="text-yellow-400 font-bold text-lg">{achievement.percentage}%</div>
+                                                                            <div className="text-yellow-300 text-xs">{achievement.current}/{achievement.required}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                    {/* Progress Bar */}
+                                                                    <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                                                                        <div
+                                                                            className={`h-full transition-all duration-500 ${achievement.percentage >= 75 ? 'bg-gradient-to-r from-green-500 to-green-400' :
+                                                                                achievement.percentage >= 50 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+                                                                                    'bg-gradient-to-r from-red-500 to-red-400'
+                                                                                }`}
+                                                                            style={{ width: `${achievement.percentage}%` }}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Unlocked Achievements */}
+                                                <div>
+                                                    <h4 className="text-md font-bold text-green-400 mb-3 flex items-center gap-2 border-b border-green-700/40 pb-2">
+                                                        <span className="w-5 h-5 rounded bg-green-700 flex items-center justify-center text-xs font-bold">
+                                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                            </svg>
+                                                        </span>
+                                                        Unlocked Achievements ({achievementProgress.filter(a => a.unlocked).length})
+                                                    </h4>
+                                                    <div className="space-y-2">
+                                                        {achievementProgress
+                                                            .filter(a => a.unlocked)
+                                                            .map((achievement, i) => (
+                                                                <div key={i} className="bg-gradient-to-r from-green-900/50 to-green-700/50 rounded p-2 border border-green-500/40 shadow flex items-center gap-2 hover:border-green-400/60 transition-colors">
+                                                                    <span className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                                                                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                                        </svg>
+                                                                    </span>
+                                                                    <div className="flex-1">
+                                                                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold text-white mr-2 ${achievement.definition.type === 'passive' ? 'bg-purple-700' :
+                                                                            achievement.definition.type === 'title' ? 'bg-indigo-900' :
+                                                                                'bg-yellow-600'
+                                                                            }`}>
+                                                                            {achievement.definition.type.toUpperCase()}
+                                                                        </span>
+                                                                        <span className="text-green-100 font-bold text-sm">{achievement.definition.title}</span>
+                                                                    </div>
+                                                                    <span className="text-green-300 text-xs font-bold">COMPLETE</span>
+                                                                </div>
+                                                            ))}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </Tabs.Content>
                                 <Tabs.Content value="passives">

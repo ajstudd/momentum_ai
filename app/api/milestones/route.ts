@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwt } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongodb";
 import User from "@/lib/models/User";
+import Milestone from "@/lib/models/Milestone";
 
 // GET: Fetch milestones (internal)
 export async function GET(req: NextRequest) {
@@ -15,11 +16,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
   await connectToDB();
-  const user = await User.findById(payload.userId).select("milestones");
+
+  const user = await User.findById(payload.userId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
-  return NextResponse.json(user.milestones || []);
+
+  // Get milestones from Milestone collection
+  const milestones = await Milestone.find({ userId: payload.userId })
+    .sort({ achievedAt: -1 })
+    .lean();
+
+  return NextResponse.json(milestones || []);
 }
 
 // POST: Update milestones (internal)
@@ -35,11 +43,33 @@ export async function POST(req: NextRequest) {
   }
   await connectToDB();
   const body = await req.json();
+
   const user = await User.findById(payload.userId);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
-  user.milestones = body.milestones;
-  await user.save();
+
+  // Delete existing milestones and create new ones
+  await Milestone.deleteMany({ userId: payload.userId });
+
+  if (Array.isArray(body.milestones)) {
+    const milestonesToCreate = body.milestones.map(
+      (m: {
+        badge: string;
+        achieved: boolean;
+        achievedAt: Date;
+        criteria: string;
+      }) => ({
+        userId: payload.userId,
+        badge: m.badge,
+        achieved: m.achieved,
+        achievedAt: m.achievedAt,
+        criteria: m.criteria,
+      })
+    );
+
+    await Milestone.insertMany(milestonesToCreate);
+  }
+
   return NextResponse.json({ success: true });
 }
