@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json(
       { error: "Stats initialized. Please retry." },
-      { status: 503 }
+      { status: 503 },
     );
   }
 
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
         completedAt: quest.completedAt,
         rewards: quest.rewards,
       })),
-      user.profile || {}
+      user.profile || {},
     );
 
     // Cache the quests in db
@@ -99,12 +99,44 @@ export async function GET(req: NextRequest) {
         quests: parsed,
         updatedAt: new Date(),
       },
-      { upsert: true }
+      { upsert: true },
     );
 
     return NextResponse.json(parsed);
   } catch (e: unknown) {
+    // Check if it's a quota error
+    const isQuotaError = e instanceof Error && e.name === "GeminiQuotaError";
+
+    if (isQuotaError) {
+      console.log(
+        "[API] Gemini quota exceeded, attempting to use cached quests",
+      );
+
+      // Try to return cached quests even if older than 24 hours
+      if (questCache && questCache.quests) {
+        console.log("[API] Returning stale cached quests due to quota limit");
+        return NextResponse.json({
+          ...questCache.quests,
+          _cached: true,
+          _cacheAge: now.getTime() - new Date(questCache.updatedAt).getTime(),
+          _warning:
+            "Using cached quests due to API quota limit. Fresh quests will be available after quota resets.",
+        });
+      }
+
+      // No cache available
+      return NextResponse.json(
+        {
+          error:
+            "Gemini API quota exceeded and no cached quests available. Please try again later.",
+          details: e instanceof Error ? e.message : "Unknown error",
+        },
+        { status: 429 },
+      );
+    }
+
     const errorMsg = e instanceof Error ? e.message : "Gemini API error";
+    console.error("[API] Error generating quests:", errorMsg);
     return NextResponse.json({ error: errorMsg }, { status: 500 });
   }
 }

@@ -67,13 +67,13 @@ export function formatFocusLogs(focusLogs: FocusLog[] = []): string {
       (log) =>
         `- [${new Date(log.chosenAt).toLocaleDateString()}] Focused on ${
           log.stat
-        } after completing "${log.questTitle}"`
+        } after completing "${log.questTitle}"`,
     )
     .join("\n");
 }
 
 export function formatCompletedQuests(
-  completedQuests: CompletedQuest[] = []
+  completedQuests: CompletedQuest[] = [],
 ): string {
   if (!completedQuests.length) return "None yet.";
   return completedQuests
@@ -83,7 +83,7 @@ export function formatCompletedQuests(
           q.questTitle
         }" (Rewards: ${q.rewards
           ?.map((r) => r.type + ": " + r.value)
-          .join(", ")})`
+          .join(", ")})`,
     )
     .join("\n");
 }
@@ -201,11 +201,25 @@ export interface UserProfile {
   [key: string]: unknown;
 }
 
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export class GeminiQuotaError extends Error {
+  retryAfter?: number;
+  constructor(message: string, retryAfter?: number) {
+    super(message);
+    this.name = "GeminiQuotaError";
+    this.retryAfter = retryAfter;
+  }
+}
+
 export async function getGeminiQuests(
   stats: Record<string, number>,
   focusLogs: FocusLog[] = [],
   completedQuests: CompletedQuest[] = [],
-  profile: UserProfile = {}
+  profile: UserProfile = {},
+  maxRetries: number = 3,
 ): Promise<GeminiSections> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set in environment");
@@ -226,44 +240,97 @@ export async function getGeminiQuests(
 
   console.log("[Gemini] Prompt:", prompt);
 
-  const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.8, maxOutputTokens: 8192 },
-    }),
-  });
-  console.log("[Gemini] Response status:", res.status);
-  const data = await res.json();
-  console.log("[Gemini] Response body:", JSON.stringify(data));
-  if (!res.ok) throw new Error(data?.error?.message || "Gemini API error");
+  let lastError: Error | null = null;
 
-  const candidate = data?.candidates?.[0];
-  if (candidate?.finishReason === "MAX_TOKENS") {
-    throw new Error(
-      "Gemini response was truncated due to token limit. The JSON response is incomplete."
-    );
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Exponential backoff: 1s, 2s, 4s
+      if (attempt > 0) {
+        const backoffMs = Math.pow(2, attempt) * 1000;
+        console.log(
+          `[Gemini] Retry attempt ${attempt + 1}/${maxRetries} after ${backoffMs}ms`,
+        );
+        await sleep(backoffMs);
+      }
+
+      const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.8, maxOutputTokens: 8192 },
+        }),
+      });
+
+      console.log("[Gemini] Response status:", res.status);
+      const data = await res.json();
+
+      // Handle 429 rate limit errors
+      if (res.status === 429) {
+        const retryAfter = data?.error?.details
+          ?.find(
+            (d: { "@type": string }) =>
+              d["@type"] === "type.googleapis.com/google.rpc.RetryInfo",
+          )
+          ?.retryDelay?.replace("s", "");
+
+        const retrySeconds = retryAfter ? parseFloat(retryAfter) : null;
+        console.log(`[Gemini] Rate limit hit. Retry after: ${retrySeconds}s`);
+
+        throw new GeminiQuotaError(
+          data?.error?.message || "Gemini API quota exceeded",
+          retrySeconds || undefined,
+        );
+      }
+
+      console.log("[Gemini] Response body:", JSON.stringify(data));
+      if (!res.ok) throw new Error(data?.error?.message || "Gemini API error");
+
+      const candidate = data?.candidates?.[0];
+      if (candidate?.finishReason === "MAX_TOKENS") {
+        throw new Error(
+          "Gemini response was truncated due to token limit. The JSON response is incomplete.",
+        );
+      }
+
+      const text = candidate?.content?.parts?.[0]?.text || "";
+      if (!text) {
+        throw new Error(
+          `Gemini returned empty response. Finish reason: ${
+            candidate?.finishReason || "unknown"
+          }`,
+        );
+      }
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch)
+        throw new Error(
+          "Gemini did not return valid JSON.\nResponse text: " + text,
+        );
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return parsed;
+      } catch {
+        throw new Error("Gemini did not return valid JSON.\n" + text);
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // If it's a quota error and not the last attempt, retry
+      if (error instanceof GeminiQuotaError && attempt < maxRetries - 1) {
+        continue;
+      }
+
+      // If it's a quota error and this is the last attempt, throw it
+      if (error instanceof GeminiQuotaError) {
+        throw error;
+      }
+
+      // For other errors, throw immediately
+      throw error;
+    }
   }
 
-  const text = candidate?.content?.parts?.[0]?.text || "";
-  if (!text) {
-    throw new Error(
-      `Gemini returned empty response. Finish reason: ${
-        candidate?.finishReason || "unknown"
-      }`
-    );
-  }
-
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch)
-    throw new Error(
-      "Gemini did not return valid JSON.\nResponse text: " + text
-    );
-  try {
-    const parsed = JSON.parse(jsonMatch[0]);
-    return parsed;
-  } catch {
-    throw new Error("Gemini did not return valid JSON.\n" + text);
-  }
+  // Should never reach here, but just in case
+  throw lastError || new Error("Failed to get Gemini quests after retries");
 }
